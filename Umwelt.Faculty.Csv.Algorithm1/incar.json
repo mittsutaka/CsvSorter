@@ -1,0 +1,26 @@
+[
+  {
+    "name": "InputPath",
+    "display_name": "入力ファイルのパス",
+    "is_string": true,
+    "form": {
+      "type": "free"
+    }
+  },
+  {
+    "name": "OutputPath",
+    "display_name": "出力ファイルのパス",
+    "is_string": true,
+    "form": {
+      "type": "free"
+    }
+  },
+  {
+    "name": "Colomns",
+    "display_name": "抽出したい列名（カンマ区切り）",
+    "is_string": true,
+    "form": {
+      "type": "free"
+    }
+  }
+]

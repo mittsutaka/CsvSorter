@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Umwelt.Faculty.Csv.Algorithm1.Models;
 
@@ -15,7 +16,7 @@ namespace Umwelt.Faculty.Csv.Algorithm1
         private string[] _columnNames;
         private string[] _sortColomns;
         private List<string> _sortTypesString;
-        private List<SortTypes> _sortTypes;
+        private List<SortType> _sortTypes;
 
         public Faculty(IConfiguration configuration)
         {
@@ -26,10 +27,17 @@ namespace Umwelt.Faculty.Csv.Algorithm1
             _columnNames = incar["TargetHeaders"].Split(',');
             _sortColomns = incar["SortColumns"].Split(',');
             _sortTypesString = incar["SortTypes"].Split(',').ToList();
-            _sortTypes = new List<SortTypes>();
-            _sortTypes.Add(SortTypes.Date);
-            _sortTypes.Add(SortTypes.String);
-            _sortTypes.Add(SortTypes.Number);
+            _sortTypes = new List<SortType>();
+            _sortTypesString.ForEach(t =>
+            {
+                if (Enum.TryParse(typeof(SortType), t, out var res))
+                {
+                    if (res is not null)
+                    {
+                        _sortTypes.Add((SortType)res);
+                    }
+                }
+            });
         }
 
         public async Task ExecuteAsync()
@@ -74,9 +82,9 @@ namespace Umwelt.Faculty.Csv.Algorithm1
         class RecordCompare : IComparer<Record>
         {
             private List<int> _indexes;
-            private List<SortTypes> _sortTypes;
+            private List<SortType> _sortTypes;
 
-            public RecordCompare(List<int> indexes, List<SortTypes> sortTypes)
+            public RecordCompare(List<int> indexes, List<SortType> sortTypes)
             {
                 _indexes = indexes;
                 _sortTypes = sortTypes;
@@ -85,42 +93,67 @@ namespace Umwelt.Faculty.Csv.Algorithm1
             public int Compare(Record? x, Record? y)
             {
                 var j = 0;
+                if (x is null || y is null) return 0;
                 foreach (var index in _indexes)
                 {
                     if (index != 0) j++;
-                    if (_sortTypes[j] == SortTypes.String)
+                    if (_sortTypes[j] == SortType.String)
                     {
-                        var res = string.Compare(x?.Keys[index], y?.Keys[index]);
+                        var xValue = x.Keys[index];
+                        var yValue = y.Keys[index];
+                        var res = string.Compare(xValue, yValue);
                         if (res == 0)
                         {
                             continue;
                         }
                         else
                         {
+                            var regex = new Regex(@"\d+|\D+");
+                            var xSplit = regex.Matches(xValue).Select(t => t.Value).ToList();
+                            var ySplit = regex.Matches(yValue).Select(t => t.Value).ToList();
+
+                            var count = xSplit.Count;
+                            if (xSplit.Count > ySplit.Count) count = ySplit.Count;
+
+                            for (var c = 0; c < count; c++)
+                            {
+                                if (xSplit[c] == ySplit[c])
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    if (double.TryParse(xSplit[c], out var num1) && double.TryParse(ySplit[c], out var num2))
+                                    {
+                                        return num1 > num2 ? 1 : -1;
+                                    }
+                                    else
+                                    {
+                                        return string.Compare(xSplit[c], ySplit[c]);
+                                    }
+                                }
+                            }
+
                             return res;
                         }
                     }
-                    else if (_sortTypes[j] == SortTypes.Number)
+                    else if (_sortTypes[j] == SortType.Number)
                     {
-                        var xValue = int.Parse(x?.Keys[index]);
-                        var yValue = int.Parse(y?.Keys[index]);
+                        var xValue = int.Parse(x.Keys[index]);
+                        var yValue = int.Parse(y.Keys[index]);
                         if (xValue == yValue)
                         {
                             continue;
                         }
-                        else if (xValue > yValue)
-                        {
-                            return 1;
-                        }
                         else
                         {
-                            return -1;
+                            return xValue > yValue ? 1 : -1;
                         }
                     }
-                    else if (_sortTypes[j] == SortTypes.Date)
+                    else if (_sortTypes[j] == SortType.Date)
                     {
-                        var xValue = DateTime.Parse(x?.Keys[index]);
-                        var yValue = DateTime.Parse(y?.Keys[index]);
+                        var xValue = DateTime.Parse(x.Keys[index]);
+                        var yValue = DateTime.Parse(y.Keys[index]);
                         var res = DateTime.Compare(xValue, yValue);
                         if (res == 0)
                         {
@@ -137,7 +170,7 @@ namespace Umwelt.Faculty.Csv.Algorithm1
             }
         }
 
-        private enum SortTypes
+        private enum SortType
         {
             Number,
             String,
